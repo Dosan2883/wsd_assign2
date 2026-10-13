@@ -1,14 +1,63 @@
 package edu.classroom.board;
 
 import jakarta.servlet.http.HttpServletRequest;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.time.Instant;
+import java.util.Date;
+import java.util.HexFormat;
+import javax.crypto.SecretKey;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
-  // JJWT 의존성은 pom.xml에 포함되어 있습니다. app.jwt.* 설정은 application.properties 참조.
+  private final String jwtSecret;
+  private final String jwtIssuer;
+  private final String jwtAudience;
+  private final long tokenTtlSeconds;
+
+  public AuthService(
+      @Value("${app.jwt.secret}") String jwtSecret,
+      @Value("${app.jwt.issuer:webservice-class}") String jwtIssuer,
+      @Value("${app.jwt.audience:board-api}") String jwtAudience,
+      @Value("${app.jwt.ttl:90}") long tokenTtlSeconds) {
+    this.jwtSecret = jwtSecret;
+    this.jwtIssuer = jwtIssuer;
+    this.jwtAudience = jwtAudience;
+    this.tokenTtlSeconds = tokenTtlSeconds;
+  }
+
   public String issueToken(Users.PublicUser user) {
-    // TODO BE-01: 서버 키로 HS256 JWT 발급. sub, exp, iss, aud 필수.
-    throw new ApiError(501, "NOT_IMPLEMENTED", "JWT 발급을 구현하세요. BE-01");
+    if (tokenTtlSeconds <= 0) {
+      throw new IllegalStateException("app.jwt.ttl must be greater than zero");
+    }
+
+    final byte[] secretBytes;
+    try {
+      secretBytes = HexFormat.of().parseHex(jwtSecret);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException("app.jwt.secret must be a hexadecimal key", e);
+    }
+
+    final SecretKey signingKey;
+    try {
+      signingKey = Keys.hmacShaKeyFor(secretBytes);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException("app.jwt.secret must contain at least 32 bytes", e);
+    }
+
+    Instant now = Instant.now();
+    Date expiresAt = Date.from(now.plusSeconds(tokenTtlSeconds));
+    return Jwts.builder()
+        .subject(Long.toString(user.id()))
+        .issuer(jwtIssuer)
+        .audience()
+        .add(jwtAudience)
+        .and()
+        .expiration(expiresAt)
+        .signWith(signingKey, Jwts.SIG.HS256)
+        .compact();
   }
 
   public long currentUserId(HttpServletRequest request) {
