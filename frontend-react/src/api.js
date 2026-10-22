@@ -5,8 +5,8 @@ export function clearSession() {
   session = { accessToken: "", user: null };
 }
 function authorizationHeaders() {
-  // TODO FE-02: 메모리에 보관한 토큰을 Bearer 헤더로 보내세요.
-  return {};
+  if (!session.accessToken) return {};
+  return { Authorization: `Bearer ${session.accessToken}` };
 }
 export async function request(path, options = {}) {
   const response = await fetch(`/api${path}`, {
@@ -30,9 +30,12 @@ export async function request(path, options = {}) {
   return data;
 }
 export async function login(email, password) {
-  // TODO FE-01: POST /auth/login → 응답의 토큰과 사용자 정보를 session에 저장.
-  // request()를 이용할 수 있습니다. 성공하면 user를 반환하세요.
-  throw new Error("로그인 연결은 학생 구현 항목입니다. FE-01을 완성하세요.");
+  const result = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  session = { accessToken: result.accessToken, user: result.user };
+  return result.user;
 }
 export function canEdit(post) {
   // TODO FE-04: 로그인 사용자와 작성자를 비교하세요. 서버 검사도 반드시 필요합니다.
