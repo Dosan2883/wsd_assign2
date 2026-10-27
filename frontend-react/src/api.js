@@ -19,10 +19,12 @@ export async function request(path, options = {}) {
   });
   const data = response.status === 204 ? null : await response.json();
   if (!response.ok) {
-    // TODO FE-03: 401이면 메모리의 로그인 상태도 해제하세요.
-    const error = new Error(
-      data.message || data.code || `HTTP ${response.status}`,
-    );
+    if (response.status === 401) clearSession();
+    const message =
+      response.status === 401 && path !== "/auth/login"
+        ? "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인하세요."
+        : data.message || data.code || `HTTP ${response.status}`;
+    const error = new Error(message);
     error.status = response.status;
     error.code = data.code;
     throw error;
@@ -38,8 +40,7 @@ export async function login(email, password) {
   return result.user;
 }
 export function canEdit(post) {
-  // TODO FE-04: 로그인 사용자와 작성자를 비교하세요. 서버 검사도 반드시 필요합니다.
-  return true; // 시작 코드에서는 CRUD를 체험할 수 있도록 모두 표시합니다.
+  return session.user?.id === post?.authorId;
 }
 export const api = {
   list: () => request("/posts"),
