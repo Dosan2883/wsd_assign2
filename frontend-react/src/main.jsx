@@ -21,6 +21,17 @@ function App() {
       setMessage(success);
     } catch (e) {
       setMessage(e.message);
+      if (e.status === 401) {
+        reset();
+      } else if (e.code === "NOT_FOUND") {
+        setSelected(null);
+        setEditing(null);
+        try {
+          await refresh();
+        } catch {
+          // Keep the original not-found message visible.
+        }
+      }
     } finally {
       setUser(getSession().user);
       setBusy(false);
@@ -36,6 +47,10 @@ function App() {
   }
   async function save(e) {
     e.preventDefault();
+    if (!user) {
+      setMessage("글을 작성하거나 수정하려면 먼저 로그인하세요.");
+      return;
+    }
     await run(async () => {
       const p = editing
         ? await api.update(editing, { title, content })
@@ -48,15 +63,14 @@ function App() {
   return (
     <main>
       <header>
-        <span className="eyebrow">WEB SERVICE DESIGN · STARTER</span>
+        <span className="eyebrow">WEB SERVICE DESIGN · BOARD</span>
         <h1>우리의 기록</h1>
         <p className="muted">
-          나만의 주제를 정하고, 로그인과 작성자 권한을 연결해 보세요.
+          게시글은 누구나 읽을 수 있으며, 로그인한 사용자는 본인 글을 관리할 수 있습니다.
         </p>
       </header>
       <p className="banner">
-        시작 코드: 인증 미완성 · 글쓰기는 데모 작성자 Alice로 처리됩니다. 인증과
-        권한 검사를 완성한 뒤 안내 문구를 수정하세요.
+        로그인 후 글을 작성할 수 있습니다. 수정과 삭제는 작성자만 할 수 있습니다.
       </p>
       <div role="status" className="message">
         {message}
@@ -69,7 +83,14 @@ function App() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                run(() => login(email, password), "로그인했습니다.");
+                run(
+                  async () => {
+                    const previousUser = getSession().user;
+                    const nextUser = await login(email, password);
+                    if (previousUser && previousUser.id !== nextUser.id) reset();
+                  },
+                  "로그인했습니다.",
+                );
               }}
             >
               <label>
@@ -95,9 +116,11 @@ function App() {
                 <button
                   type="button"
                   className="secondary"
+                  disabled={!user}
                   onClick={() => {
                     clearSession();
                     setUser(null);
+                    reset();
                     setMessage("이 탭의 로그인 상태를 해제했습니다.");
                   }}
                 >
@@ -128,6 +151,7 @@ function App() {
           </section>
           <section className="card">
             <h2>{editing ? "게시글 수정" : "새 글 작성"}</h2>
+            {!user && <p className="muted">글을 작성하려면 먼저 로그인하세요.</p>}
             <form onSubmit={save}>
               <label>
                 제목
@@ -148,7 +172,7 @@ function App() {
                 />
               </label>
               <div className="actions">
-                <button disabled={busy}>
+                <button disabled={busy || !user}>
                   {editing ? "수정 저장" : "등록"}
                 </button>
                 <button type="button" className="secondary" onClick={reset}>
@@ -202,6 +226,7 @@ function App() {
                   <div className="actions">
                     <button
                       className="secondary"
+                      disabled={busy}
                       onClick={() => {
                         setEditing(selected.id);
                         setTitle(selected.title);

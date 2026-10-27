@@ -16,11 +16,11 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
-  private final String jwtSecret;
   private final String jwtIssuer;
   private final String jwtAudience;
   private final long tokenTtlSeconds;
   private final Users users;
+  private final SecretKey jwtSigningKey;
 
   public AuthService(
       Users users,
@@ -29,17 +29,23 @@ public class AuthService {
       @Value("${app.jwt.audience:board-api}") String jwtAudience,
       @Value("${app.jwt.ttl:90}") long tokenTtlSeconds) {
     this.users = users;
-    this.jwtSecret = jwtSecret;
     this.jwtIssuer = jwtIssuer;
     this.jwtAudience = jwtAudience;
     this.tokenTtlSeconds = tokenTtlSeconds;
+    if (jwtSecret == null
+        || jwtSecret.isBlank()
+        || "REPLACE_WITH_RANDOM_64_HEX_CHARACTERS".equals(jwtSecret)
+        || !jwtSecret.matches("[0-9a-fA-F]{64}")) {
+      throw new IllegalStateException(
+          "JWT_SECRET must be a newly generated 64-character hexadecimal string");
+    }
+    if (tokenTtlSeconds <= 0) {
+      throw new IllegalStateException("TOKEN_TTL must be greater than zero");
+    }
+    this.jwtSigningKey = Keys.hmacShaKeyFor(HexFormat.of().parseHex(jwtSecret));
   }
 
   public String issueToken(Users.PublicUser user) {
-    if (tokenTtlSeconds <= 0) {
-      throw new IllegalStateException("app.jwt.ttl must be greater than zero");
-    }
-
     Instant now = Instant.now();
     Date expiresAt = Date.from(now.plusSeconds(tokenTtlSeconds));
     return Jwts.builder()
@@ -49,23 +55,8 @@ public class AuthService {
         .add(jwtAudience)
         .and()
         .expiration(expiresAt)
-        .signWith(signingKey(), Jwts.SIG.HS256)
+        .signWith(jwtSigningKey, Jwts.SIG.HS256)
         .compact();
-  }
-
-  private SecretKey signingKey() {
-    final byte[] secretBytes;
-    try {
-      secretBytes = HexFormat.of().parseHex(jwtSecret);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalStateException("app.jwt.secret must be a hexadecimal key", e);
-    }
-
-    try {
-      return Keys.hmacShaKeyFor(secretBytes);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalStateException("app.jwt.secret must contain at least 32 bytes", e);
-    }
   }
 
   public long currentUserId(HttpServletRequest request) {
@@ -74,15 +65,19 @@ public class AuthService {
       throw new ApiError(401, "TOKEN_REQUIRED", "로그인이 필요합니다.");
     }
 
-    String[] parts = authorization.trim().split("\\s+", 2);
-    if (parts.length != 2 || !parts[0].equalsIgnoreCase("Bearer") || parts[1].isBlank()) {
+    String[] parts = authorization.trim().split("\\s+");
+    if (parts.length != 2 || !parts[0].equalsIgnoreCase("Bearer")) {
       throw new ApiError(401, "TOKEN_REQUIRED", "Bearer 토큰을 보내세요.");
     }
 
     try {
       Jws<Claims> parsed =
           Jwts.parser()
-              .verifyWith(signingKey())
+              .verifyWith(jwtSigningKey)
+              .sig()
+              .clear()
+              .add(Jwts.SIG.HS256)
+              .and()
               .requireIssuer(jwtIssuer)
               .requireAudience(jwtAudience)
               .build()

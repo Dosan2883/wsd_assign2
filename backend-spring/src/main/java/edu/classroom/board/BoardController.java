@@ -30,10 +30,11 @@ public class BoardController {
     for (var e : limits.entrySet()) {
       Object v = body.get(e.getKey());
       if (!(v instanceof String)) throw new ApiError(400, "BAD_INPUT", "문자열을 입력하세요.");
-      String s = (String) v, t = s.strip();
-      if (t.isEmpty() || t.codePointCount(0, t.length()) > e.getValue())
+      String raw = (String) v;
+      String value = e.getKey().equals("password") ? raw : raw.strip();
+      if (value.isEmpty() || value.codePointCount(0, value.length()) > e.getValue())
         throw new ApiError(400, "BAD_INPUT", e.getKey() + " 입력을 확인하세요.");
-      out.put(e.getKey(), e.getKey().equals("password") ? s : t);
+      out.put(e.getKey(), value);
     }
     return out;
   }
