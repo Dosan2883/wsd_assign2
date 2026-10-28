@@ -14,7 +14,7 @@
 
 - [구현 보고서 PDF](docs/report.pdf)
 
-보고서 PDF를 위 경로에 추가하세요. 테스트 증거를 보고서에만 포함한 경우 별도 폴더 링크를 삭제하고 해당 보고서 페이지를 안내하세요. 경로를 바꿨다면 링크도 수정합니다. GitHub에서 링크가 실제로 열리는지 확인하세요.
+보고서는 `docs/report.pdf`에 있습니다. 제출 전 보고서와 테스트 도구를 함께 커밋·push하고 GitHub에서 위 링크가 열리는지 확인해야 합니다.
 
 ## 프로젝트 구조
 
@@ -22,13 +22,15 @@
 .
 ├── README.md
 ├── .gitignore
-├── frontend/          # 선택한 프론트 소스와 의존성 파일
-├── backend/           # 선택한 백엔드 소스와 의존성 파일
+├── frontend/          # React 프론트엔드
+├── backend/           # Spring Boot 백엔드
+├── tools/
+│   └── check_api.py   # API 자동 검사 도구
 └── docs/
     └── report.pdf
 ```
 
-[실제 제출 폴더 이름에 맞게 수정]
+이하 명령은 복제한 저장소의 루트 폴더를 기준으로 합니다.
 
 ## 실행 환경
 
@@ -46,7 +48,7 @@
 
 ## 설치와 실행
 
-아래 명령은 Windows PowerShell 기준입니다. Node.js와 JDK를 설치하고 `node --version`, `java -version`으로 확인합니다. Maven Wrapper의 첫 실행에는 의존성 다운로드를 위한 인터넷 연결이 필요합니다.
+아래 명령은 Windows PowerShell 기준입니다. Git, Node.js, JDK 17 이상을 설치하고 `node --version`, `java -version`으로 확인합니다. Maven Wrapper의 첫 실행에는 의존성 다운로드를 위한 인터넷 연결이 필요합니다.
 
 ### 1 저장소 복제
 
@@ -60,15 +62,15 @@ cd wsd_assign2
 저장소 루트에서 실행합니다. 새 무작위 키를 환경변수에 저장하며 실제 키를 문서나 소스 코드에 기록하지 않습니다.
 
 ```powershell
-cd backend-spring
+cd backend
 $env:JWT_SECRET = node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))"
 $env:TOKEN_TTL = '90'
 .\mvnw.cmd package
 java -jar target/jwt-board-1.0.0.jar
 ```
 
-- 환경설정 예시: `backend-spring/env.example.txt`
-- 설정 연결: `backend-spring/src/main/resources/application.properties`. Spring은 `.env` 파일을 자동으로 읽지 않습니다.
+- 환경설정 예시: `backend/env.example.txt`
+- 설정 연결: `backend/src/main/resources/application.properties`. Spring은 `.env` 파일을 자동으로 읽지 않습니다.
 - JWT_SECRET: 64자리 16진수 키가 필요하며, 누락·예시 값·잘못된 형식이면 서버 시작을 거부합니다. 새 터미널에서는 환경변수를 다시 설정합니다.
 - TOKEN_TTL: 기본값 90초. 만료 검사 시 서버를 종료하고 `$env:TOKEN_TTL = '3'`으로 변경한 뒤 같은 실행 명령으로 재시작합니다. 검사 후 90초로 복원합니다.
 - 백엔드 주소: http://127.0.0.1:8000
@@ -87,7 +89,7 @@ Invoke-RestMethod http://127.0.0.1:8000/api/health
 백엔드를 켜 두고 새 터미널에서 저장소 루트로 이동한 뒤 실행합니다.
 
 ```powershell
-cd frontend-react
+cd frontend
 npm ci
 npm run build
 npm run preview
@@ -95,7 +97,7 @@ npm run preview
 
 - 최종 확인 주소: http://127.0.0.1:4173
 - 개발 중 실행: `npm run dev`, http://127.0.0.1:5173
-- API 연결: 브라우저의 `/api` 요청을 Vite가 `http://127.0.0.1:8000`으로 전달합니다. 개발용 `server.proxy`와 빌드 확인용 `preview.proxy`는 `frontend-react/vite.config.js`에 있습니다.
+- API 연결: 브라우저의 `/api` 요청을 Vite가 `http://127.0.0.1:8000`으로 전달합니다. 개발용 `server.proxy`와 빌드 확인용 `preview.proxy`는 `frontend/vite.config.js`에 있습니다.
 - 백엔드 포트 변경: 서버 시작 전에 `$env:PORT = '새 포트 번호'`를 설정하고 두 프록시의 대상 포트도 같은 값으로 수정합니다. 프론트 포트는 Vite의 `server.port`와 `preview.port`에서 변경합니다.
 - 종료: 프론트와 백엔드를 실행한 각 터미널에서 Ctrl+C를 누릅니다.
 - 코드 변경 후 재실행: 프론트는 종료 후 `npm run build`, `npm run preview`를 순서대로 실행합니다. 백엔드는 종료 후 `.\mvnw.cmd package`로 다시 빌드하고 같은 환경변수가 설정된 터미널에서 JAR를 재실행합니다.
@@ -108,18 +110,18 @@ npm run preview
 | Bob | bob@class.test | Classroom!2026 |
 
 - 계정은 과제 전용 테스트 계정이며 `Users.java`에서 관리합니다.
-- 위 실행 절차의 SQLite 파일 위치는 `backend-spring/data/board.sqlite`입니다. 실행 디렉터리를 기준으로 폴더·파일·posts 테이블을 자동 생성합니다.
+- 위 실행 절차의 SQLite 파일 위치는 `backend/data/board.sqlite`입니다. 실행 디렉터리를 기준으로 폴더·파일·posts 테이블을 자동 생성합니다.
 - 경로 변경: 서버 시작 전 `$env:DB_FILE = '원하는 SQLite 파일 경로'`를 설정합니다.
 - DB 초기화: 서버를 종료한 뒤 백엔드 폴더에서 `Remove-Item -LiteralPath .\data\board.sqlite`를 실행하고 재시작합니다. 기존 실습 게시글이 모두 삭제됩니다. DB_FILE을 변경했다면 해당 파일 경로를 사용합니다.
 - 서버 재시작 후 데이터 유지: 파일 DB를 사용하는 구현은 확인했습니다. 실제 재시작 검증 결과는 아직 기록되지 않았습니다. 글 작성 후 서버를 재시작하고 같은 글의 내용과 작성자를 조회해 확인합니다.
 
 ## 구현 완료 범위
 
-아래 완료 표시는 소스 코드 구현 기준입니다. 실제 실행 검증과 화면 증거 수집은 별도입니다. Java 파일은 `backend-spring/src/main/java/edu/classroom/board/`에 있습니다.
+아래 완료 표시는 소스 코드 구현 기준입니다. 실제 실행 검증과 화면 증거 수집은 별도입니다. Java 파일은 `backend/src/main/java/edu/classroom/board/`에 있습니다.
 
 | 기능 | 완료 여부 | 주요 파일 또는 함수 |
 |---|---|---|
-| 공개 목록과 상세 | 구현 완료 | BoardController.list/get, PostStore.list/get, frontend-react/src/main.jsx |
+| 공개 목록과 상세 | 구현 완료 | BoardController.list/get, PostStore.list/get, frontend/src/main.jsx |
 | 로그인과 JWT 발급 | 구현 완료 | BoardController.login, Users.verify, AuthService.issueToken |
 | JWT 검증과 내 정보 조회 | 구현 완료 | AuthService.currentUserId, BoardController.me |
 | 글 작성과 작성자 저장 | 구현 완료 | BoardController.create, PostStore.create |
@@ -157,24 +159,30 @@ python tools/check_api.py --base http://127.0.0.1:8000 --mode final --expiry
 | 보호 API의 인증 실패 | WWW-Authenticate: Bearer 응답 헤더 | 미기록 |
 | 화면·새로고침·로그아웃·DB 유지 | 401 시 로그인 해제, 403 시 로그인 유지, 새로고침 시 메모리 세션 초기화, DB 글 유지 | 미기록 |
 
-전체 수동 절차는 [T01~T17 시나리오](05_테스트시나리오.md)를 따릅니다. 실제 HTTP 상태, JSON code, 응답 헤더와 화면을 기록할 위치는 [보고서 작성본](04_보고서_작성본.docx)의 4절 ‘테스트 결과’ 및 후속 증거 절입니다.
+수동으로 다음 항목을 확인하고 실제 결과와 화면 증거를 보고서에 기록합니다.
+
+1. 비로그인 상태에서 게시글 목록·상세를 조회합니다.
+2. Alice로 로그인하여 글을 작성·수정하고, Bob으로 로그인하여 Alice 글의 수정·삭제가 제한되는지 확인합니다.
+3. 본인 글 삭제, 잘못된 로그인 정보, 입력 오류 안내를 확인합니다.
+4. 로그아웃과 새로고침 후 로그인 상태가 해제되는지 확인합니다. TOKEN_TTL=3으로 재시작한 서버에서는 로그인 후 3초 이상 기다린 뒤 보호 API를 요청하여 만료 안내를 확인합니다.
+5. TOKEN_TTL을 90으로 복원하고 글을 작성합니다. 백엔드를 종료한 뒤 같은 DB 경로로 재시작하여 글의 내용과 작성자가 유지되는지 확인합니다.
 
 ## 핵심 구현 설명
 
-1. 로그인: [BoardController.java](../backend-spring/src/main/java/edu/classroom/board/BoardController.java)의 `login`이 입력을 검사하고 `Users.verify`로 계정을 확인합니다. [AuthService.java](../backend-spring/src/main/java/edu/classroom/board/AuthService.java)의 `issueToken`이 사용자 ID인 sub, iss, aud, exp를 포함한 HS256 JWT를 발급합니다.
-2. 보관과 전송: [api.js](../frontend-react/src/api.js)의 `login`이 토큰과 사용자 정보를 모듈 메모리에 저장합니다. `request`는 토큰이 있으면 Authorization: Bearer 헤더를 붙입니다. 새로고침과 로그아웃은 메모리의 로그인 상태를 초기화합니다.
+1. 로그인: [BoardController.java](backend/src/main/java/edu/classroom/board/BoardController.java)의 `login`이 입력을 검사하고 `Users.verify`로 계정을 확인합니다. [AuthService.java](backend/src/main/java/edu/classroom/board/AuthService.java)의 `issueToken`이 사용자 ID인 sub, iss, aud, exp를 포함한 HS256 JWT를 발급합니다.
+2. 보관과 전송: [api.js](frontend/src/api.js)의 `login`이 토큰과 사용자 정보를 모듈 메모리에 저장합니다. `request`는 토큰이 있으면 Authorization: Bearer 헤더를 붙입니다. 새로고침과 로그아웃은 메모리의 로그인 상태를 초기화합니다.
 3. 서버 검증: `AuthService.currentUserId`가 헤더 형식, 서명, HS256 알고리즘, 만료, issuer, audience, sub 형식 및 사용자 존재 여부를 검사합니다. 인증 실패는 401과 원인별 오류 code로 반환합니다.
-4. 작성자 권한: 글 생성 시 서버가 검증한 사용자 ID를 작성자로 저장합니다. 수정·삭제 시 `assertOwner`가 인증 사용자와 DB의 authorId를 비교하여 불일치하면 403을 반환합니다. 요청 본문에 authorId를 추가하면 허용되지 않은 필드로 거부합니다. 화면의 수정·삭제 버튼도 [main.jsx](../frontend-react/src/main.jsx)와 `canEdit`으로 제한합니다.
+4. 작성자 권한: 글 생성 시 서버가 검증한 사용자 ID를 작성자로 저장합니다. 수정·삭제 시 `assertOwner`가 인증 사용자와 DB의 authorId를 비교하여 불일치하면 403을 반환합니다. 요청 본문에 authorId를 추가하면 허용되지 않은 필드로 거부합니다. 화면의 수정·삭제 버튼도 [main.jsx](frontend/src/main.jsx)와 `canEdit`으로 제한합니다.
 
 ## AI 활용 요약과 참고 자료
 
 - AI 사용 여부: 사용
 - 도구와 사용 목적: ChatGPT 6.0 Astra Medium, 설계 및 보고서 작성 / ChatGPT 6.0 Luna Extra High, 코드 작성
 - 반영 위치와 직접 수정·검증한 내용: 보고서 설명 부분 / TODO에 맞는 코드 작성
-- 상세 활용 기록: [보고서 해당 절]
-- 참고한 수업 자료·외부 코드·공식 문서: [자료 제목, URL, 사용 위치]
+- 상세 활용 기록: [구현 보고서](docs/report.pdf). 제출 전 실제 AI 활용 사례와 본인의 수정·검증 내용을 포함했는지 확인해야 합니다.
+- 참고 자료의 제목·URL·사용 위치는 실제 참고 내역에 맞게 보고서에 기록해야 합니다.
 
-AI 미사용이면 미사용을 명시하고 참고 자료만 기록하세요. 사용량 자체로 가감점하지 않으며 기록과 검증의 명확성을 평가합니다.
+AI 활용 내역은 작성자가 기재한 내용이며, 실제 실행 검증 결과는 위 테스트 표에 별도로 기록합니다.
 
 ## 제출 확인
 
@@ -187,4 +195,4 @@ AI 미사용이면 미사용을 명시하고 참고 자료만 기록하세요. �
 - [ ] 비밀 키·실제 토큰·DB·node_modules·.venv·target을 커밋하지 않았다.
 - [ ] 최종 push 후 저장소 URL과 제출 기준 커밋 SHA를 LMS에 제출했다.
 
-이 문서의 상대 링크는 현재 위치인 docs 폴더 기준입니다. 루트 README.md로 옮길 때는 같은 폴더의 문서 링크에 `docs/`를 붙이고 소스 링크 앞의 `../`를 제거해야 합니다.
+이 README는 저장소 루트에 있으며, 모든 상대 링크는 저장소 루트를 기준으로 합니다. `docs/report.pdf`와 `tools/check_api.py`도 커밋·push해야 새로 clone한 환경에서 사용할 수 있습니다.
